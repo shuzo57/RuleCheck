@@ -3,4 +3,4 @@ uvicorn[standard]
 python-dotenv
 google-generativeai
 pydantic
-python-pptx          # ← PPTX 抽出用
+python-pptx
