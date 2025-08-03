@@ -1,0 +1,6 @@
+{
+  "name": "規定チェックAI（仮） v4",
+  "description": "パワポのスライドをアップロードして、AIによる改善提案を瞬時に受け取ることができます。指摘事項は表形式で表示され、Excelとしてダウンロードも可能です。",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
