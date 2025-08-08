@@ -45,3 +45,42 @@ export const parsePptx = async (file: File): Promise<string> => {
     reader.readAsArrayBuffer(file);
   });
 };
+
+
+export const parsePptxForPreview = async (file: File): Promise<string[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      if (!event.target || !event.target.result) {
+        return reject(new Error("ファイルの読み込みに失敗しました。"));
+      }
+      try {
+        const zip = await JSZip.loadAsync(event.target.result);
+        const slidePromises: Promise<{ index: number; xml: string }>[] = [];
+
+        zip.folder('ppt/slides')?.forEach((_, fileEntry) => {
+          const match = fileEntry.name.match(/ppt\/slides\/slide(\d+)\.xml$/);
+          if (match) {
+            const slideIndex = parseInt(match[1], 10);
+            slidePromises.push(
+              fileEntry.async('string').then((xml: string) => ({ index: slideIndex, xml }))
+            );
+          }
+        });
+
+        const slideData = await Promise.all(slidePromises);
+        slideData.sort((a, b) => a.index - b.index);
+
+        const slidesText = slideData.map(slide => extractTextFromXml(slide.xml).trim());
+        resolve(slidesText);
+        
+      } catch (e) {
+        reject(new Error("PPTXファイルのプレビュー解析に失敗しました。"));
+      }
+    };
+    reader.onerror = () => {
+      reject(new Error("ファイルの読み込み中にエラーが発生しました。"));
+    };
+    reader.readAsArrayBuffer(file);
+  });
+};

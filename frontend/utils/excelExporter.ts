@@ -1,4 +1,5 @@
 
+
 import type { AnalysisItem } from '../types';
 
 declare var XLSX: any;
@@ -14,6 +15,7 @@ export const exportToExcel = (data: AnalysisItem[], fileName: string, includeBas
         '根拠': item.basis,
         '指摘事項': item.issue,
         '改善案': item.suggestion,
+        '修正の種類': item.correctionType,
       };
     }
     return {
@@ -21,6 +23,7 @@ export const exportToExcel = (data: AnalysisItem[], fileName: string, includeBas
       'カテゴリ': item.category,
       '指摘事項': item.issue,
       '改善案': item.suggestion,
+      '修正の種類': item.correctionType,
     };
   });
 
@@ -36,6 +39,7 @@ export const exportToExcel = (data: AnalysisItem[], fileName: string, includeBas
         { wch: 30 }, // 根拠
         { wch: 50 }, // 指摘事項
         { wch: 50 }, // 改善案
+        { wch: 15 }, // 修正の種類
       ];
   } else {
       worksheet['!cols'] = [
@@ -43,6 +47,7 @@ export const exportToExcel = (data: AnalysisItem[], fileName: string, includeBas
         { wch: 15 }, // カテゴリ
         { wch: 50 }, // 指摘事項
         { wch: 50 }, // 改善案
+        { wch: 15 }, // 修正の種類
       ];
   }
 

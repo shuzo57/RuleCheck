@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback } from 'react';
 import LoginScreen from './components/LoginScreen';
-import Dashboard from './components/Dashboard';
+import MainApp from './components/MainApp';
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -15,9 +14,9 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-100 font-sans">
       {isLoggedIn ? (
-        <Dashboard onLogout={handleLogout} />
+        <MainApp onLogout={handleLogout} />
       ) : (
         <LoginScreen onLogin={handleLogin} />
       )}

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 
 interface LoginScreenProps {
@@ -19,10 +18,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="max-w-md w-full bg-white shadow-xl rounded-lg p-8 space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+      <div className="max-w-md w-full bg-white shadow-xl rounded-2xl p-8 space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
             規定チェックAI（仮）
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600">
@@ -30,7 +29,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
+          <div className="space-y-4">
             <div>
               <label htmlFor="email-address" className="sr-only">
                 メールアドレス
@@ -41,7 +40,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 type="email"
                 autoComplete="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow"
                 placeholder="メールアドレス"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -57,7 +56,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="relative block w-full px-4 py-3 border border-slate-300 placeholder-slate-500 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-shadow"
                 placeholder="パスワード"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -68,7 +67,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <div>
             <button
               type="submit"
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-transform hover:scale-105"
             >
               ログイン
             </button>
