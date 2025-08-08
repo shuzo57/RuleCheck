@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     GEMINI_API_KEY: str
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
-    DB_URL: str = "postgresql+psycopg://rulecheck_user:your_password@localhost:5432/rulecheck_db"
+    DB_URL: str = "sqlite:///./local.db"
     STORAGE_DIR: str = "./app/storage"
 
     class Config:
