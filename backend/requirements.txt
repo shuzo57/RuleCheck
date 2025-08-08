@@ -1,9 +1,11 @@
 fastapi
 uvicorn[standard]
 python-dotenv
+python-multipart
 google-generativeai
 google-genai
 pydantic
+pydantic_settings
 python-pptx
 markitdown
 pandas

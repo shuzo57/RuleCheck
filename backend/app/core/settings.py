@@ -1,8 +1,14 @@
-from pathlib import Path
-from dotenv import load_dotenv
-import os
+from typing import List
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
-API_KEY: str = os.getenv("API_KEY") or ""
-if not API_KEY:
-    raise RuntimeError("API_KEY is not set")
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    GEMINI_API_KEY: str
+    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+settings = Settings()
