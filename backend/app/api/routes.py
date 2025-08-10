@@ -1,3 +1,4 @@
+# routes.py
 import hashlib, os, logging
 from io import BytesIO
 from typing import List, Optional
@@ -19,6 +20,7 @@ from app.crud import (
     bulk_create_analysis_items,
     list_analyses_by_file,
     get_analysis_with_items,
+    list_files
 )
 
 logger = logging.getLogger(__name__)
@@ -59,7 +61,32 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         sha256=digest,
         size_bytes=len(data),
     )
-    return {"file_id": rec.id, "filename": rec.filename, "sha256": rec.sha256}
+    return {
+        "file_id": rec.id,
+        "filename": rec.filename,
+        "size_bytes": rec.size_bytes,
+        "sha256": rec.sha256
+    }
+
+
+@router.get("/files")
+def get_files(db: Session = Depends(get_db)):
+    files = list_files(db, user_id=FAKE_USER_ID)
+    return [
+        {
+            "id": str(f.id),
+            "file": None,
+            "name": f.filename,
+            "size": f.size_bytes,
+            "uploadDate": f.created_at.isoformat(),
+            "status": "pending",
+            "analysisResult": [],
+            "error": None,
+            "isBasisAugmented": False,
+            "augmentationStatus": "idle",
+        }
+        for f in files
+    ]
 
 
 @router.delete("/files/{file_id}")

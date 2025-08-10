@@ -1,3 +1,4 @@
+# crud.py
 from typing import Iterable, Sequence
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -31,6 +32,8 @@ def create_file(
 def get_file(db: Session, file_id: int) -> File | None:
     return db.get(File, file_id)
 
+def list_files(db: Session, user_id: str):
+    return db.query(File).filter(File.user_id == user_id).order_by(File.created_at.desc()).all()
 
 def delete_file(db: Session, file_id: int) -> None:
     f = db.get(File, file_id)

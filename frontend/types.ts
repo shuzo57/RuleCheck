@@ -1,4 +1,4 @@
-
+// types.ts
 export interface AnalysisItem {
   id: string; // unique ID for each item
   slideNumber: number;
