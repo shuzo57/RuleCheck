@@ -1,5 +1,5 @@
 // src/services/fileService.ts
-import { AnalysisDetail, AnalysisSummary, ManagedFile } from '../types';
+import { AnalysisDetail, AnalysisItem, AnalysisSummary, ManagedFile } from '../types';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -9,7 +9,7 @@ export async function fetchFiles(): Promise<ManagedFile[]> {
     const list = await res.json();
     return list.map((f: any) => ({
         ...f,
-        file: undefined, // サーバーからは送られない
+        file: undefined,
     })) as ManagedFile[];
 }
 
@@ -49,21 +49,38 @@ export async function startAnalysis(id: string): Promise<number | void> {
     formData.append('file_id', id);
     const res = await fetch(`${API_BASE}/analyze`, { method: 'POST', body: formData });
     if (!res.ok) throw new Error('分析開始に失敗しました');
-    // サーバは結果JSONを返し、X-Analysis-Id ヘッダを付与
     const analysisId = res.headers.get('X-Analysis-Id');
     return analysisId ? Number(analysisId) : undefined;
 }
 
-// 分析一覧（ファイルごと）
 export async function fetchAnalysesByFile(fileId: string): Promise<AnalysisSummary[]> {
     const res = await fetch(`${API_BASE}/files/${fileId}/analyses`);
     if (!res.ok) throw new Error('分析一覧の取得に失敗しました');
     return res.json();
 }
 
-// 分析詳細
 export async function getAnalysis(analysisId: number): Promise<AnalysisDetail> {
     const res = await fetch(`${API_BASE}/analyses/${analysisId}`);
     if (!res.ok) throw new Error('分析詳細の取得に失敗しました');
     return res.json();
+}
+
+/** 最新の分析 items を取得してフロント用( id: string )に整形 */
+export async function fetchLatestAnalysisItems(fileId: string): Promise<AnalysisItem[]> {
+    const summaries = await fetchAnalysesByFile(fileId);
+    if (!summaries || summaries.length === 0) return [];
+
+    const latest = summaries[0];
+    const detail = await getAnalysis(latest.id);
+    const items = detail.items ?? [];
+
+    return items.map((i) => ({
+        id: String(i.id ?? crypto.randomUUID()),
+        slideNumber: i.slideNumber,
+        category: i.category,
+        basis: i.basis,
+        issue: i.issue,
+        suggestion: i.suggestion,
+        correctionType: '任意',
+    }));
 }
