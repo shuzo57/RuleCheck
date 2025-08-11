@@ -72,21 +72,25 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
 @router.get("/files")
 def get_files(db: Session = Depends(get_db)):
     files = list_files(db, user_id=FAKE_USER_ID)
-    return [
-        {
+    result = []
+    for f in files:
+        # そのファイルの最新解析があるかを見る（簡易実装：存在すれば success、なければ pending）
+        analyses = list_analyses_by_file(db, file_id=f.id, user_id=FAKE_USER_ID)
+        status = "success" if len(analyses) > 0 else "pending"
+        result.append({
             "id": str(f.id),
             "file": None,
             "name": f.filename,
             "size": f.size_bytes,
             "uploadDate": f.created_at.isoformat(),
-            "status": "pending",
-            "analysisResult": [],
+            "status": status,
+            "analysisResult": [],   # 一覧では返さない（詳細APIで取得）
             "error": None,
             "isBasisAugmented": False,
             "augmentationStatus": "idle",
-        }
-        for f in files
-    ]
+        })
+    return result
+
 
 
 @router.delete("/files/{file_id}")

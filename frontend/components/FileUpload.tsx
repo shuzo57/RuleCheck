@@ -1,3 +1,4 @@
+// FileUpload.tsx
 import React, { useCallback, useState } from 'react';
 import { uploadFiles } from '../services/fileService';
 import type { ManagedFile } from '../types';
