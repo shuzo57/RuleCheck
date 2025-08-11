@@ -1,24 +1,18 @@
-// src/components/AnalysisTable.tsx
 import React from 'react';
 import type { AnalysisItem } from '../types';
-import { DownloadIcon, LibraryIcon, PlusCircleIcon, TrashIcon } from './icons';
+import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons';
 
 interface AnalysisTableProps {
   data: AnalysisItem[];
   isBasisAugmented: boolean;
-
-  // Controls for the header bar
   onDownload?: () => void;
   isAugmenting?: boolean;
   onAugment?: () => void;
   onAddItem?: () => void;
-
-  // For interactive editing
   onRowClick?: (index: number) => void;
   onDeleteItem?: (id: string) => void;
 }
 
-// ★ correctionType はサーバから来ないことがあるためオプショナルで安全化
 const CorrectionTypeBadge: React.FC<{ type?: '必須' | '任意' }> = ({ type = '任意' }) => {
   const isMandatory = type === '必須';
   const colorClasses = isMandatory
@@ -32,22 +26,25 @@ const CorrectionTypeBadge: React.FC<{ type?: '必須' | '任意' }> = ({ type = 
 };
 
 const AnalysisTable: React.FC<AnalysisTableProps> = ({
-  data, isBasisAugmented,
-  onDownload, isAugmenting, onAugment, onAddItem,
-  onRowClick, onDeleteItem
+  data,
+  isBasisAugmented,
+  onDownload,
+  onAddItem,
+  onRowClick,
+  onDeleteItem,
 }) => {
-
   const renderControlBar = () => {
     return (
       <div className="flex items-center flex-wrap gap-2">
         <button
           onClick={onAddItem}
-          disabled={isAugmenting}
-          className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
         >
           <PlusCircleIcon className="h-5 w-5 mr-2" />
           指摘事項を追加
         </button>
+
+        {/*
         <button
           onClick={onAugment}
           disabled={isBasisAugmented || isAugmenting}
@@ -56,10 +53,11 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
           <LibraryIcon className="h-5 w-5 mr-2" />
           {isAugmenting ? '根拠を追加中...' : '根拠の追加'}
         </button>
+        */}
+
         <button
           onClick={onDownload}
-          disabled={isAugmenting}
-          className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:bg-green-300 transition-colors shadow-sm"
+          className="flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors shadow-sm"
         >
           <DownloadIcon className="h-5 w-5 mr-2" />
           Excel出力

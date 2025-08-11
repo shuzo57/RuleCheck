@@ -148,7 +148,8 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
         return (
           <div className="flex items-center justify-center space-x-2 text-green-600">
             <CheckCircleIcon className="h-6 w-6" />
-            <span>一次分析が完了しました。</span>
+            {/* <span>一次分析が完了しました。</span> */}
+            <span>分析が完了しました。</span>
           </div>
         );
       case 'pending':
