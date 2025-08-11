@@ -1,10 +1,10 @@
 # crud.py
 from typing import Iterable, Sequence
-from sqlalchemy.orm import Session
-from sqlalchemy import select
 
-from app.models import File, Analysis, AnalysisItemRow
+from app.models import Analysis, AnalysisItemRow, File
 from app.services.schemas import AnalysisItem
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def create_file(
