@@ -8,6 +8,7 @@ import Spinner from './Spinner';
 import UndoToast from './UndoToast';
 import { AlertTriangleIcon, CheckCircleIcon, ChevronLeftIcon, FileIcon } from './icons';
 import { createAnalysisItemForLatest, deleteAnalysisItem as apiDeleteAnalysisItem, updateAnalysisItem as apiUpdateAnalysisItem } from '../services/fileService';
+import ChangeSummary, { ChangeSummaryData } from './ChangeSummary';
 
 interface AnalysisScreenProps {
   fileData: ManagedFile;
@@ -20,6 +21,7 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [undoCache, setUndoCache] = useState<{ previousState: AnalysisItem[]; timerId: number | null } | null>(null);
+  const [lastChange, setLastChange] = useState<ChangeSummaryData | null>(null);
 
   // クリーンアップ
   useEffect(() => {
@@ -61,10 +63,20 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
     async (updatedItem: AnalysisItem) => {
       if (!updatedItem.id) return;
       try {
+        const before = fileData.analysisResult.find(i => i.id === updatedItem.id);
         const saved = await apiUpdateAnalysisItem(updatedItem);
         const newResults = fileData.analysisResult.map(item => (item.id === saved.id ? saved : item));
         newResults.sort((a, b) => a.slideNumber - b.slideNumber);
         onUpdateFile(fileData.id, { analysisResult: newResults });
+        if (before) {
+          const diff: ChangeSummaryData['diff'] = {};
+          (['slideNumber','category','basis','issue','suggestion','correctionType'] as const).forEach((k) => {
+            if (before[k] !== (saved as any)[k]) {
+              (diff as any)[k] = { before: before[k], after: (saved as any)[k] };
+            }
+          });
+          setLastChange({ action: 'update', before, after: saved, diff });
+        }
       } catch (e) {
         console.error(e);
         alert('指摘事項の保存に失敗しました');
@@ -100,6 +112,7 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
       onUpdateFile(fileData.id, { analysisResult: newResults });
       setEditingItemId(created.id);
       setIsModalOpen(true);
+      setLastChange({ action: 'create', before: null, after: created });
     } catch (e) {
       console.error(e);
       alert('指摘事項の追加に失敗しました');
@@ -117,10 +130,12 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
   const handleDeleteItem = useCallback(
     async (itemId: string) => {
       try {
+        const before = fileData.analysisResult.find(item => item.id === itemId) || null;
         await apiDeleteAnalysisItem(itemId);
         const newResults = fileData.analysisResult.filter(item => item.id !== itemId);
         onUpdateFile(fileData.id, { analysisResult: newResults });
         if (editingItemId === itemId) handleCloseModal();
+        if (before) setLastChange({ action: 'delete', before, after: null });
       } catch (e) {
         console.error(e);
         alert('指摘事項の削除に失敗しました');
@@ -203,6 +218,10 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
       <div className="flex justify-center items-center h-24">
         {(fileData.status === 'parsing' || fileData.status === 'analyzing') ? <Spinner /> : renderStatus()}
       </div>
+
+      {lastChange && (
+        <ChangeSummary data={lastChange} onDismiss={() => setLastChange(null)} />
+      )}
 
       {(fileData.status === 'success' || (fileData.status === 'error' && fileData.analysisResult.length > 0)) && (
         <div>
