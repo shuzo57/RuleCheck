@@ -1,28 +1,23 @@
 # routes.py
-import hashlib, os, logging
+import hashlib
+import logging
+import os
 from io import BytesIO
 from typing import List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
+from app.core.settings import settings
+from app.crud import (bulk_create_analysis_items, create_analysis, create_file,
+                      delete_file, get_analysis_with_items, get_file,
+                      get_latest_analysis, list_analyses_by_file, list_files)
+from app.db import get_db
+from app.models import Analysis, AnalysisItemRow
+from app.services.analysis import analyze_xml
+from app.services.pptx_parser import PptxConverter
+from app.services.schemas import (AnalysisItem, AnalysisItemCreate,
+                                  AnalysisItemUpdate)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
-
-from app.db import get_db
-from app.core.settings import settings
-from app.services.pptx_parser import PptxConverter
-from app.services.analysis import analyze_xml
-from app.services.schemas import AnalysisItem, AnalysisItemCreate, AnalysisItemUpdate
-from app.models import AnalysisItemRow, Analysis
-from app.crud import (
-    create_file,
-    get_file,
-    delete_file,
-    create_analysis,
-    bulk_create_analysis_items,
-    list_analyses_by_file,
-    get_analysis_with_items,
-    list_files
-)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -288,3 +283,28 @@ def delete_analysis_item(item_id: int, db: Session = Depends(get_db)):
     db.delete(row)
     db.commit()
     return {"ok": True}
+
+
+@router.get("/files/{file_id}/analyses/latest")
+def get_latest_analysis_for_file(file_id: int, db: Session = Depends(get_db)):
+    latest, items = get_latest_analysis(db, file_id=file_id, user_id=FAKE_USER_ID)
+    if not latest:
+        raise HTTPException(404, "no analysis found")
+
+    return {
+        "id": latest.id,
+        "created_at": str(latest.created_at),
+        "model": latest.model,
+        "status": latest.status,
+        "items": [
+            {
+                "id": r.id,
+                "slideNumber": r.slide_number,
+                "category": r.category,
+                "basis": r.basis,
+                "issue": r.issue,
+                "suggestion": r.suggestion,
+            }
+            for r in items
+        ],
+    }

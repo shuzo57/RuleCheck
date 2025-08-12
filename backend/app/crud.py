@@ -101,3 +101,23 @@ def get_analysis_with_items(db: Session, analysis_id: int) -> tuple[Analysis | N
     q = select(AnalysisItemRow).where(AnalysisItemRow.analysis_id == analysis_id).order_by(AnalysisItemRow.id.asc())
     items = list(db.execute(q).scalars().all())
     return a, items
+
+
+def get_latest_analysis(db: Session, file_id: int, user_id: str) -> tuple[Analysis | None, list[AnalysisItemRow]]:
+    q = (
+        select(Analysis)
+        .where(Analysis.file_id == file_id, Analysis.user_id == user_id)
+        .order_by(Analysis.created_at.desc())
+        .limit(1)
+    )
+    latest = db.execute(q).scalar_one_or_none()
+    if not latest:
+        return None, []
+
+    q_items = (
+        select(AnalysisItemRow)
+        .where(AnalysisItemRow.analysis_id == latest.id)
+        .order_by(AnalysisItemRow.id.asc())
+    )
+    items = list(db.execute(q_items).scalars().all())
+    return latest, items
