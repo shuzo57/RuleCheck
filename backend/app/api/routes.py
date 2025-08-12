@@ -11,7 +11,8 @@ from app.db import get_db
 from app.core.settings import settings
 from app.services.pptx_parser import PptxConverter
 from app.services.analysis import analyze_xml
-from app.services.schemas import AnalysisItem
+from app.services.schemas import AnalysisItem, AnalysisItemCreate, AnalysisItemUpdate
+from app.models import AnalysisItemRow, Analysis
 from app.crud import (
     create_file,
     get_file,
@@ -194,3 +195,96 @@ def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
             for r in rows
         ],
     }
+
+
+@router.post("/files/{file_id}/analyses/latest/items")
+def add_item_to_latest_analysis(
+    file_id: int,
+    item: AnalysisItemCreate,
+    db: Session = Depends(get_db),
+):
+    f = get_file(db, file_id)
+    if not f or f.user_id != FAKE_USER_ID:
+        raise HTTPException(404, "file not found")
+
+    analyses = list_analyses_by_file(db, file_id=file_id, user_id=FAKE_USER_ID)
+    if analyses:
+        a = analyses[0]
+    else:
+        a = create_analysis(
+            db,
+            user_id=FAKE_USER_ID,
+            file_id=file_id,
+            model="manual-edit",
+            rules_version=None,
+            result_json=[],
+        )
+
+    row = AnalysisItemRow(
+        analysis_id=a.id,
+        slide_number=item.slideNumber,
+        category=item.category,
+        basis=item.basis,
+        issue=item.issue,
+        suggestion=item.suggestion,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "slideNumber": row.slide_number,
+        "category": row.category,
+        "basis": row.basis,
+        "issue": row.issue,
+        "suggestion": row.suggestion,
+    }
+
+
+@router.patch("/analysis-items/{item_id}")
+def update_analysis_item(
+    item_id: int,
+    patch: AnalysisItemUpdate,
+    db: Session = Depends(get_db),
+):
+    row = db.get(AnalysisItemRow, item_id)
+    if not row:
+        raise HTTPException(404, "item not found")
+    # Permission: ensure owner matches
+    if not row.analysis or row.analysis.user_id != FAKE_USER_ID:
+        raise HTTPException(403, "forbidden")
+
+    if patch.slideNumber is not None:
+        row.slide_number = patch.slideNumber
+    if patch.category is not None:
+        row.category = patch.category
+    if patch.basis is not None:
+        row.basis = patch.basis
+    if patch.issue is not None:
+        row.issue = patch.issue
+    if patch.suggestion is not None:
+        row.suggestion = patch.suggestion
+
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "slideNumber": row.slide_number,
+        "category": row.category,
+        "basis": row.basis,
+        "issue": row.issue,
+        "suggestion": row.suggestion,
+    }
+
+
+@router.delete("/analysis-items/{item_id}")
+def delete_analysis_item(item_id: int, db: Session = Depends(get_db)):
+    row = db.get(AnalysisItemRow, item_id)
+    if not row:
+        raise HTTPException(404, "item not found")
+    if not row.analysis or row.analysis.user_id != FAKE_USER_ID:
+        raise HTTPException(403, "forbidden")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}

@@ -7,6 +7,7 @@ import EditAnalysisModal from './EditAnalysisModal';
 import Spinner from './Spinner';
 import UndoToast from './UndoToast';
 import { AlertTriangleIcon, CheckCircleIcon, ChevronLeftIcon, FileIcon } from './icons';
+import { createAnalysisItemForLatest, deleteAnalysisItem as apiDeleteAnalysisItem, updateAnalysisItem as apiUpdateAnalysisItem } from '../services/fileService';
 
 interface AnalysisScreenProps {
   fileData: ManagedFile;
@@ -57,11 +58,17 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
   }, []);
 
   const handleSaveModal = useCallback(
-    (updatedItem: AnalysisItem) => {
+    async (updatedItem: AnalysisItem) => {
       if (!updatedItem.id) return;
-      const newResults = fileData.analysisResult.map(item => (item.id === updatedItem.id ? updatedItem : item));
-      newResults.sort((a, b) => a.slideNumber - b.slideNumber);
-      onUpdateFile(fileData.id, { analysisResult: newResults });
+      try {
+        const saved = await apiUpdateAnalysisItem(updatedItem);
+        const newResults = fileData.analysisResult.map(item => (item.id === saved.id ? saved : item));
+        newResults.sort((a, b) => a.slideNumber - b.slideNumber);
+        onUpdateFile(fileData.id, { analysisResult: newResults });
+      } catch (e) {
+        console.error(e);
+        alert('指摘事項の保存に失敗しました');
+      }
     },
     [fileData.id, fileData.analysisResult, onUpdateFile],
   );
@@ -80,20 +87,23 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
     [editingItemId, fileData.analysisResult],
   );
 
-  const handleAddItem = useCallback(() => {
-    const newItem: AnalysisItem = {
-      id: crypto.randomUUID(),
-      slideNumber: 1,
-      category: '表現',
-      basis: '',
-      issue: '',
-      suggestion: '',
-      correctionType: '任意',
-    };
-    const newResults = [...fileData.analysisResult, newItem];
-    onUpdateFile(fileData.id, { analysisResult: newResults });
-    setEditingItemId(newItem.id);
-    setIsModalOpen(true);
+  const handleAddItem = useCallback(async () => {
+    try {
+      const created = await createAnalysisItemForLatest(fileData.id, {
+        slideNumber: 1,
+        category: '表現',
+        basis: '',
+        issue: '',
+        suggestion: '',
+      });
+      const newResults = [...fileData.analysisResult, created];
+      onUpdateFile(fileData.id, { analysisResult: newResults });
+      setEditingItemId(created.id);
+      setIsModalOpen(true);
+    } catch (e) {
+      console.error(e);
+      alert('指摘事項の追加に失敗しました');
+    }
   }, [fileData.id, fileData.analysisResult, onUpdateFile]);
 
   const handleUndoDelete = useCallback(() => {
@@ -105,16 +115,18 @@ const AnalysisScreen: React.FC<AnalysisScreenProps> = ({ fileData, onUpdateFile,
   }, [undoCache, fileData.id, onUpdateFile]);
 
   const handleDeleteItem = useCallback(
-    (itemId: string) => {
-      if (undoCache?.timerId) clearTimeout(undoCache.timerId);
-      const originalState = fileData.analysisResult;
-      const newResults = originalState.filter(item => item.id !== itemId);
-      onUpdateFile(fileData.id, { analysisResult: newResults });
-      if (editingItemId === itemId) handleCloseModal();
-      const newTimerId = window.setTimeout(() => setUndoCache(null), 7000);
-      setUndoCache({ previousState: originalState, timerId: newTimerId });
+    async (itemId: string) => {
+      try {
+        await apiDeleteAnalysisItem(itemId);
+        const newResults = fileData.analysisResult.filter(item => item.id !== itemId);
+        onUpdateFile(fileData.id, { analysisResult: newResults });
+        if (editingItemId === itemId) handleCloseModal();
+      } catch (e) {
+        console.error(e);
+        alert('指摘事項の削除に失敗しました');
+      }
     },
-    [fileData.id, fileData.analysisResult, editingItemId, onUpdateFile, handleCloseModal, undoCache?.timerId],
+    [fileData.id, fileData.analysisResult, editingItemId, onUpdateFile, handleCloseModal],
   );
 
   const editingItem = editingItemId ? fileData.analysisResult.find(item => item.id === editingItemId) : null;

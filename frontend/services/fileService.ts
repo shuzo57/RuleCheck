@@ -84,3 +84,64 @@ export async function fetchLatestAnalysisItems(fileId: string): Promise<Analysis
         correctionType: '任意',
     }));
 }
+
+/** 最新分析に item を追加（サーバ作成→返却） */
+export async function createAnalysisItemForLatest(
+    fileId: string,
+    payload: Omit<AnalysisItem, 'id' | 'correctionType'>,
+): Promise<AnalysisItem> {
+    const res = await fetch(`${API_BASE}/files/${fileId}/analyses/latest/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            slideNumber: payload.slideNumber,
+            category: payload.category,
+            basis: payload.basis,
+            issue: payload.issue,
+            suggestion: payload.suggestion,
+        }),
+    });
+    if (!res.ok) throw new Error('指摘事項の追加に失敗しました');
+    const data = await res.json();
+    return {
+        id: String(data.id),
+        slideNumber: data.slideNumber,
+        category: data.category,
+        basis: data.basis,
+        issue: data.issue,
+        suggestion: data.suggestion,
+        correctionType: '任意',
+    };
+}
+
+/** item を更新 */
+export async function updateAnalysisItem(item: AnalysisItem): Promise<AnalysisItem> {
+    const res = await fetch(`${API_BASE}/analysis-items/${Number(item.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            slideNumber: item.slideNumber,
+            category: item.category,
+            basis: item.basis,
+            issue: item.issue,
+            suggestion: item.suggestion,
+        }),
+    });
+    if (!res.ok) throw new Error('指摘事項の更新に失敗しました');
+    const data = await res.json();
+    return {
+        id: String(data.id),
+        slideNumber: data.slideNumber,
+        category: data.category,
+        basis: data.basis,
+        issue: data.issue,
+        suggestion: data.suggestion,
+        correctionType: item.correctionType ?? '任意',
+    };
+}
+
+/** item を削除 */
+export async function deleteAnalysisItem(itemId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/analysis-items/${Number(itemId)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('指摘事項の削除に失敗しました');
+}

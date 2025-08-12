@@ -41,11 +41,10 @@ class AnalysisItemRow(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"))
-
     slide_number: Mapped[int] = mapped_column(Integer, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
     basis: Mapped[str] = mapped_column(Text, nullable=False)
     issue: Mapped[str] = mapped_column(Text, nullable=False)
     suggestion: Mapped[str] = mapped_column(Text, nullable=False)
 
-    analysis: Mapped[Analysis] = relationship(back_populates="items")
+    analysis: Mapped["Analysis"] = relationship(back_populates="items")
