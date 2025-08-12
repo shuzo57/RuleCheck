@@ -1,14 +1,24 @@
-# analysis.py
 import json
 from typing import List
 
+from app.core.settings import settings
+from app.services.schemas import AnalysisItem
 from google import genai
 from google.genai import types
 
-from app.core.settings import settings
-from app.services.schemas import AnalysisItem
-
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+DEFAULT_RULES = """
+1. 誤字脱字の確認と修正提案
+2. 製品名の不使用（成分名のみを使用）
+3. 恐怖をあおるような表現の禁止
+4. 治癒・完治など断定的治療効果表現の禁止
+5. 医療行為や医療現場を想起させる表現の禁止
+6. 効果・効能の誇大表現の禁止
+7. 出典や作成者名の明記確認（両方とも欠けている場合のみ指摘）
+8. 特定医療機関名への誘導表現の禁止
+9. 一般生活者向け広告表現の禁止（一般用医薬品等を除く）
+""".strip()
 
 def _build_prompt(xml_str: str, rules: str) -> str:
     return f"""
@@ -16,15 +26,7 @@ def _build_prompt(xml_str: str, rules: str) -> str:
     薬機法および以下の「チェック対象ルール」に照らし、違反または懸念箇所を指摘してください。
 
     ## チェック対象ルール
-    1. 誤字脱字の確認と修正提案
-    2. 製品名の不使用（成分名のみを使用）
-    3. 恐怖をあおるような表現の禁止
-    4. 治癒・完治など断定的治療効果表現の禁止
-    5. 医療行為や医療現場を想起させる表現の禁止
-    6. 効果・効能の誇大表現の禁止
-    7. 出典や作成者名の明記確認（両方とも欠けている場合のみ指摘）
-    8. 特定医療機関名への誘導表現の禁止
-    9. 一般生活者向け広告表現の禁止（一般用医薬品等を除く）
+    {rules}
 
     ## スライド XML
     {xml_str}
