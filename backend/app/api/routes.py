@@ -145,6 +145,57 @@ async def analyze(
         logger.exception("analyze failed")
         raise HTTPException(500, f"解析に失敗しました: {e}")
 
+"""
+@router.post("/analyze", response_model=List[AnalysisItem])
+async def analyze(
+    file_id: int = Form(...),
+    rules: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    f = get_file(db, file_id)
+    if not f or f.user_id != FAKE_USER_ID:
+        raise HTTPException(404, "file not found")
+
+    abs_path = os.path.join(settings.STORAGE_DIR, f.path)
+    xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
+
+    try:
+        # ★ 本来は analyze_xml(xml_str, rules) だが、ダミーで固定出力
+        items = [
+            AnalysisItem(
+                slideNumber=1,
+                category="表現",
+                basis="2",
+                issue="（ダミー）スライド1で禁止表現が見つかりました。",
+                suggestion="表現をより中立的にしてください。"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="根拠",
+                basis="3",
+                issue="（ダミー）スライド2で出典不足があります。",
+                suggestion="出典を明記してください。"
+            )
+        ]
+
+        payload = [i.model_dump() for i in items]
+
+        analysis = create_analysis(
+            db,
+            user_id=FAKE_USER_ID,
+            file_id=file_id,
+            model="mock",              # ← gemini ではなく "mock" として保存
+            rules_version=None,
+            result_json=payload,
+        )
+        bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
+
+        return JSONResponse(content=payload, headers={"X-Analysis-Id": str(analysis.id)})
+    except Exception as e:
+        logger.exception("analyze failed")
+        raise HTTPException(500, f"解析に失敗しました: {e}")
+"""
+
 
 @router.get("/files/{file_id}/analyses")
 def list_analyses(file_id: int, db: Session = Depends(get_db)):
