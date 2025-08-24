@@ -2,15 +2,14 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# correctionType は「必須」または「任意」で管理
+# correctionType は「必須」または「任意」を受け付ける
 CorrectionType = Literal["必須", "任意"]
 
 
 class AnalysisItem(BaseModel):
     slideNumber: int = Field(..., ge=1)
-    # 既存のカテゴリ定義は環境依存で文字化けしやすいため、型は str にすると緩やかだが
-    # 互換性のため Literal を維持（元の値はそのまま）。
-    category: Literal["誤植", "表現", "出典"]
+    # カテゴリは自由入力を許可
+    category: str
     basis: str
     issue: str
     suggestion: str
@@ -19,7 +18,7 @@ class AnalysisItem(BaseModel):
 
 class AnalysisItemCreate(BaseModel):
     slideNumber: int = Field(..., ge=1)
-    category: Literal["誤植", "表現", "出典"]
+    category: str
     basis: str
     issue: str
     suggestion: str
@@ -28,7 +27,7 @@ class AnalysisItemCreate(BaseModel):
 
 class AnalysisItemUpdate(BaseModel):
     slideNumber: Optional[int] = Field(None, ge=1)
-    category: Optional[Literal["誤植", "表現", "出典"]] = None
+    category: Optional[str] = None
     basis: Optional[str] = None
     issue: Optional[str] = None
     suggestion: Optional[str] = None
