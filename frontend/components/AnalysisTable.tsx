@@ -34,7 +34,7 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
   onDeleteItem,
 }) => {
   const [sortState, setSortState] = useState<{ key: 'fixType' | 'slide'; order: 'asc' | 'desc' }>({
-    key: 'fixType',
+    key: 'slide',
     order: 'asc',
   });
 
