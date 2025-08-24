@@ -1,15 +1,16 @@
+# routes.py
 import hashlib
 import logging
 import os
+from io import BytesIO
 from typing import List, Optional
-from xml.etree import ElementTree as ET
 
 from app.core.settings import settings
 from app.crud import (bulk_create_analysis_items, create_analysis, create_file,
                       delete_file, get_analysis_with_items, get_file,
                       get_latest_analysis, list_analyses_by_file, list_files)
 from app.db import get_db
-from app.models import AnalysisItemRow
+from app.models import Analysis, AnalysisItemRow
 from app.services.analysis import analyze_xml
 from app.services.pptx_parser import PptxConverter
 from app.services.schemas import (AnalysisItem, AnalysisItemCreate,
@@ -38,7 +39,7 @@ def _sha256(b: bytes) -> str:
 @router.post("/files")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not (file.filename or "").lower().endswith(".pptx"):
-        raise HTTPException(400, "pptxファイルのみ対応しています")
+        raise HTTPException(400, "pptx ファイルをアチE�Eロードしてください、E)
 
     data = await file.read()
     digest = _sha256(data)
@@ -60,7 +61,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         "file_id": rec.id,
         "filename": rec.filename,
         "size_bytes": rec.size_bytes,
-        "sha256": rec.sha256,
+        "sha256": rec.sha256
     }
 
 
@@ -69,23 +70,21 @@ def get_files(db: Session = Depends(get_db)):
     files = list_files(db, user_id=FAKE_USER_ID)
     result = []
     for f in files:
-        analyses = list_analyses_by_file(db, file_id=f.id, user_id=FAKE_USER_ID)
+        # そ�Eファイルの最新解析があるかを見る�E�簡易実裁E��存在すれば success、なければ pending�E�E        analyses = list_analyses_by_file(db, file_id=f.id, user_id=FAKE_USER_ID)
         status = "success" if len(analyses) > 0 else "pending"
-        result.append(
-            {
-                "id": str(f.id),
-                "file": None,
-                "name": f.filename,
-                "size": f.size_bytes,
-                "uploadDate": f.created_at.isoformat(),
-                "status": status,
-                "analysisResult": [],
-                "error": None,
-                "isBasisAugmented": False,
-                "augmentationStatus": "idle",
-            }
-        )
+        result.append({
+            "id": str(f.id),
+            "file": None,
+            "name": f.filename,
+            "size": f.size_bytes,
+            "uploadDate": f.created_at.isoformat(),
+            "status": status,
+            "analysisResult": [],   # 一覧では返さなぁE��詳細APIで取得！E            "error": None,
+            "isBasisAugmented": False,
+            "augmentationStatus": "idle",
+        })
     return result
+
 
 
 @router.delete("/files/{file_id}")
@@ -104,78 +103,53 @@ def remove_file(file_id: int, db: Session = Depends(get_db)):
 @router.post("/pptx/xml")
 async def pptx_to_xml(file: UploadFile = File(...), pretty: Optional[bool] = Form(True)):
     if not (file.filename or "").lower().endswith(".pptx"):
-        raise HTTPException(400, "pptxファイルのみ対応しています")
-    xml_str = PptxConverter.convert_to_xml(file, pretty=bool(pretty))
+        raise HTTPException(400, "pptx ファイルをアチE�Eロードしてください、E)
+    data = await file.read()
+    bio = BytesIO(data)
+    bio.seek(0)
+    xml_str = PptxConverter.convert_to_xml(bio, pretty=bool(pretty))
     return Response(content=xml_str, media_type="application/xml")
 
 
-def _mock_items_from_xml(_: str) -> list[AnalysisItem]:
-    return [
-        AnalysisItem(
-            slideNumber=1,
-            category="誤植",
-            basis="1",
-            issue="「こんな事をる患者さんがよくいます」という表現は、助詞の使い方に誤りがあるように見受けられます。読者に違和感を与える可能性がございます。",
-            suggestion="「こんなことを言う患者さんがよくいます」など、自然な表現へご修正いただけますと幸いです。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=1,
-            category="表現",
-            basis="2",
-            issue="「オングリザという糖尿病治療剤がありますよ」という表現について、製品名の直接的な記載は薬機法上、広告と見なされる可能性がございます。",
-            suggestion="「サキサグリプチン（DPP-4阻害薬）」など一般名でのご記載を推奨いたします。対象読者が医療関係者であることも明示いただけますと安心です。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=1,
-            category="出典",
-            basis="3",
-            issue="本スライドには出典情報や作成者名の記載が確認できませんでした。",
-            suggestion="承認時評価資料、添付文書、学術論文などの出典を明記いただき、加えて作成者名や所属もご記載いただけますと、資料の信頼性が一層高まるかと存じます。",
-            correctionType="任意"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="誤植",
-            basis="1",
-            issue="「C18He25N3O2・H2O」との表記について、元素記号に誤りがあるようでございます。",
-            suggestion="正しくは「C18H25N3O2・H2O」かと存じます。ご確認のうえ、ご修正をお願いいたします。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="表現",
-            basis="2",
-            issue="「軽度の肥満であっても 糖尿病が絶対に発症してしまう」という表現は、過度に不安を与える可能性がございます。",
-            suggestion="「軽度の肥満でも発症リスクが高まる可能性がある」などの表現に見直し、あわせて根拠となる文献をご提示いただけますと説得力が増すかと存じます。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="表現",
-            basis="2",
-            issue="「血糖値が効果的にコントロールされる」という表現は、効果を断定的に印象付ける恐れがございます。",
-            suggestion="「血糖コントロールの改善が期待される」や「食事・運動療法と併用することで効果が見込まれる」といった、慎重な表現への修正をお勧めいたします。",
-            correctionType="任意"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="出典",
-            basis="3",
-            issue="本スライドにも、出典や作成者の記載が見受けられませんでした。",
-            suggestion="添付文書やPMDA資料、査読付き論文など、信頼性の高い出典を明記いただくことで、資料の正確性がより一層高まるものと存じます。",
-            correctionType="任意"
-        )
-    ]
+# @router.post("/analyze", response_model=List[AnalysisItem])
+# async def analyze(
+#     file_id: int = Form(...),
+#     rules: Optional[str] = Form(None),
+#     db: Session = Depends(get_db),
+# ):
+#     f = get_file(db, file_id)
+#     if not f or f.user_id != FAKE_USER_ID:
+#         raise HTTPException(404, "file not found")
 
+#     abs_path = os.path.join(settings.STORAGE_DIR, f.path)
+#     xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
 
+#     try:
+#         items = analyze_xml(xml_str, rules)
+#         # correctionType が無ぁE��合�E既定で「任意」に揁E��めE#         for i in items:
+#             if getattr(i, "correctionType", None) is None:
+#                 setattr(i, "correctionType", "任愁E)
+#         payload = [i.model_dump() for i in items]
+
+#         analysis = create_analysis(
+#             db,
+#             user_id=FAKE_USER_ID,
+#             file_id=file_id,
+#             model="gemini-2.5-flash",
+#             rules_version=None,
+#             result_json=payload,
+#         )
+#         bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
+
+#         return JSONResponse(content=payload, headers={"X-Analysis-Id": str(analysis.id)})
+#     except Exception as e:
+#         logger.exception("analyze failed")
+#         raise HTTPException(500, f"解析に失敗しました: {e}")
 
 @router.post("/analyze", response_model=List[AnalysisItem])
 async def analyze(
     file_id: int = Form(...),
     rules: Optional[str] = Form(None),
-    mode: Optional[str] = Form(None),  # auto | mock | llm （省略時は設定の ANALYZE_MODE または auto）
     db: Session = Depends(get_db),
 ):
     f = get_file(db, file_id)
@@ -185,60 +159,82 @@ async def analyze(
     abs_path = os.path.join(settings.STORAGE_DIR, f.path)
     xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
 
-    # 実行モードの決定
-    req_mode = (mode or settings.ANALYZE_MODE or "auto").lower()
-    if req_mode not in {"auto", "mock", "llm"}:
-        raise HTTPException(400, "mode は auto/mock/llm のいずれかを指定してください")
+    try:
+        items = [
+            AnalysisItem(
+                slideNumber=1,
+                category="誤椁E,
+                basis="1",
+                issue="「こんな事をる患老E��んがよくぁE��す」とぁE��表現は、助詞�E使ぁE��に誤りがあるように見受けられます。読老E��違和感を与える可能性がございます、E,
+                suggestion="「こんなことを言ぁE��老E��んがよくぁE��す」など、�E然な表現へご修正ぁE��だけますと幸ぁE��す、E,
+                correctionType="忁E��E
+            ),
+            AnalysisItem(
+                slideNumber=1,
+                category="表現",
+                basis="2",
+                issue="「オングリザとぁE��糖尿痁E��療剤がありますよ」とぁE��表現につぁE��、製品名の直接皁E��記載�E薬機法上、庁E��と見なされる可能性がございます、E,
+                suggestion="「サキサグリプチン�E�EPP-4阻害薬�E�」など一般名でのご記載を推奨ぁE��します。対象読老E��医療関係老E��あることも�E示ぁE��だけますと安忁E��す、E,
+                correctionType="忁E��E
+            ),
+            AnalysisItem(
+                slideNumber=1,
+                category="出典",
+                basis="3",
+                issue="本スライドには出典惁E��めE���E老E��の記載が確認できませんでした、E,
+                suggestion="承認時評価賁E��、添付文書、学術論文などの出典を�E記いただき、加えて作�E老E��めE��属もご記載いただけますと、賁E��の信頼性が一層高まるかと存じます、E,
+                correctionType="推奨"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="誤椁E,
+                basis="1",
+                issue="「C18He25N3O2・H2O」との表記につぁE��、�E素記号に誤りがあるようでござぁE��す、E,
+                suggestion="正しくは「C18H25N3O2・H2O」かと存じます。ご確認�EぁE��、ご修正をお願いぁE��します、E,
+                correctionType="忁E��E
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="表現",
+                basis="2",
+                issue="「軽度の肥満であってめE糖尿痁E��絶対に発痁E��てしまぁE��とぁE��表現は、E��度に不安を与える可能性がございます、E,
+                suggestion="「軽度の肥満でも発痁E��スクが高まる可能性がある」などの表現に見直し、あわせて根拠となる文献をご提示ぁE��だけますと説得力が増すかと存じます、E,
+                correctionType="忁E��E
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="表現",
+                basis="2",
+                issue="「血糖値が効果的にコントロールされる」とぁE��表現は、効果を断定的に印象付ける恐れがござぁE��す、E,
+                suggestion="「血糖コントロールの改喁E��期征E��れる」や「食事�E運動療法と併用することで効果が見込まれる」とぁE��た、�E重な表現への修正をお勧めいたします、E,
+                correctionType="推奨"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="出典",
+                basis="3",
+                issue="本スライドにも、�E典めE���E老E�E記載が見受けられませんでした、E,
+                suggestion="添付文書やPMDA賁E��、査読付き論文など、信頼性の高い出典を�E記いただくことで、賁E��の正確性がより一層高まるものと存じます、E,
+                correctionType="推奨"
+            )
+        ]
 
-    items: list[AnalysisItem]
-    model_name = "gemini-2.5-flash"
 
-    if req_mode == "mock":
-        items = _mock_items_from_xml(xml_str)
-        model_name = "mock"
-    elif req_mode == "llm":
-        if not settings.GEMINI_API_KEY:
-            raise HTTPException(400, "GEMINI_API_KEY が未設定のため LLM モードは利用できません")
-        try:
-            items = analyze_xml(xml_str, rules)
-        except Exception as e:
-            logger.exception("LLM analyze failed in llm mode")
-            raise HTTPException(502, f"LLM 解析に失敗しました: {e}")
-    else:  # auto
-        try:
-            if settings.GEMINI_API_KEY:
-                items = analyze_xml(xml_str, rules)
-            else:
-                raise RuntimeError("GEMINI_API_KEY is not set")
-        except Exception as e:
-            logger.warning("LLM analyze failed; fallback to mock: %s", e)
-            items = _mock_items_from_xml(xml_str)
-            model_name = "mock"
+        payload = [i.model_dump() for i in items]
 
-    for i in items:
-        if getattr(i, "correctionType", None) is None:
-            setattr(i, "correctionType", "任意")
+        analysis = create_analysis(
+            db,
+            user_id=FAKE_USER_ID,
+            file_id=file_id,
+            model="mock",              # ↁEgemini ではなぁE"mock" として保孁E            rules_version=None,
+            result_json=payload,
+        )
+        bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
 
-    payload = [i.model_dump() for i in items]
-
-    analysis = create_analysis(
-        db,
-        user_id=FAKE_USER_ID,
-        file_id=file_id,
-        model=model_name,
-        rules_version=None,
-        result_json=payload,
-    )
-    bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
-
-    return JSONResponse(
-        content=payload,
-        headers={
-            "X-Analysis-Id": str(analysis.id),
-            "X-Analysis-Mode": model_name,
-        },
-    )
-
+        return JSONResponse(content=payload, headers={"X-Analysis-Id": str(analysis.id)})
+    except Exception as e:
+        logger.exception("analyze failed")
+        raise HTTPException(500, f"解析に失敗しました: {e}")
 
 @router.get("/files/{file_id}/analyses")
 def list_analyses(file_id: int, db: Session = Depends(get_db)):
@@ -263,6 +259,7 @@ def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
     a, rows = get_analysis_with_items(db, analysis_id)
     if not a or a.user_id != FAKE_USER_ID:
         raise HTTPException(404, "analysis not found")
+
     return {
         "id": a.id,
         "file_id": a.file_id,
@@ -288,7 +285,9 @@ def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
 
 @router.post("/files/{file_id}/analyses/latest/items")
 def add_item_to_latest_analysis(
-    file_id: int, item: AnalysisItemCreate, db: Session = Depends(get_db)
+    file_id: int,
+    item: AnalysisItemCreate,
+    db: Session = Depends(get_db),
 ):
     f = get_file(db, file_id)
     if not f or f.user_id != FAKE_USER_ID:
@@ -314,7 +313,7 @@ def add_item_to_latest_analysis(
         basis=item.basis,
         issue=item.issue,
         suggestion=item.suggestion,
-        correction_type=item.correctionType or "任意",
+        correction_type=item.correctionType or "任愁E,
     )
     db.add(row)
     db.commit()
@@ -332,11 +331,14 @@ def add_item_to_latest_analysis(
 
 @router.patch("/analysis-items/{item_id}")
 def update_analysis_item(
-    item_id: int, patch: AnalysisItemUpdate, db: Session = Depends(get_db)
+    item_id: int,
+    patch: AnalysisItemUpdate,
+    db: Session = Depends(get_db),
 ):
     row = db.get(AnalysisItemRow, item_id)
     if not row:
         raise HTTPException(404, "item not found")
+    # Permission: ensure owner matches
     if not row.analysis or row.analysis.user_id != FAKE_USER_ID:
         raise HTTPException(403, "forbidden")
 
@@ -403,3 +405,4 @@ def get_latest_analysis_for_file(file_id: int, db: Session = Depends(get_db)):
             for r in items
         ],
     }
+

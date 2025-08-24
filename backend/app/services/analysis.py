@@ -6,8 +6,6 @@ from app.services.schemas import AnalysisItem
 from google import genai
 from google.genai import types
 
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
 DEFAULT_RULES = """
 1. 誤字脱字の確認と修正提案
 2. 製品名の不使用（成分名のみを使用）
@@ -44,6 +42,9 @@ def _build_prompt(xml_str: str, rules: str) -> str:
     """.strip()
 
 def analyze_xml(xml_str: str, rules: str | None = None) -> List[AnalysisItem]:
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
     prompt = _build_prompt(xml_str, rules.strip() if rules else DEFAULT_RULES)
     resp = client.models.generate_content(
         model="gemini-2.5-flash",
