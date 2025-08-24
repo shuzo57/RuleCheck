@@ -76,6 +76,7 @@ def bulk_create_analysis_items(
             basis=i.basis,
             issue=i.issue,
             suggestion=i.suggestion,
+            correction_type=(i.correctionType or "任意"),
         )
         for i in items
     ]

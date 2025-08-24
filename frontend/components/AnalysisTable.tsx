@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type { AnalysisItem } from '../types';
 import { DownloadIcon, PlusCircleIcon, TrashIcon } from './icons';
 
@@ -33,6 +33,41 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
   onRowClick,
   onDeleteItem,
 }) => {
+  const [sortState, setSortState] = useState<{ key: 'fixType' | 'slide'; order: 'asc' | 'desc' }>({
+    key: 'fixType',
+    order: 'asc',
+  });
+
+  const sorted = useMemo(() => {
+    // 元のインデックスを保持して親の onRowClick 互換性を担保
+    const decorated = data.map((item, originalIndex) => ({ item, originalIndex }));
+    decorated.sort((a, b) => {
+      let base = 0;
+      if (sortState.key === 'fixType') {
+        const va = a.item.correctionType ?? '';
+        const vb = b.item.correctionType ?? '';
+        base = String(va).localeCompare(String(vb), 'ja', { numeric: true, sensitivity: 'base' });
+      } else {
+        const va = a.item.slideNumber ?? 0;
+        const vb = b.item.slideNumber ?? 0;
+        base = va - vb;
+      }
+      if (base === 0) {
+        // タイブレーク: スライド番号 → 元インデックス
+        const t = (a.item.slideNumber ?? 0) - (b.item.slideNumber ?? 0);
+        base = t !== 0 ? t : a.originalIndex - b.originalIndex;
+      }
+      return sortState.order === 'asc' ? base : -base;
+    });
+    return decorated;
+  }, [data, sortState]);
+
+  const toggleSort = (key: 'fixType' | 'slide') =>
+    setSortState((prev) => ({
+      key,
+      order: prev.key === key && prev.order === 'asc' ? 'desc' : 'asc',
+    }));
+
   const renderControlBar = () => {
     return (
       <div className="flex items-center flex-wrap gap-2">
@@ -76,26 +111,43 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-24">スライド番号</th>
+              <th
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-28 select-none cursor-pointer"
+                onClick={() => toggleSort('slide')}
+                title="スライド番号で並び替え"
+              >
+                スライド番号 {sortState.key === 'slide' ? (sortState.order === 'asc' ? '▲' : '▼') : ''}
+              </th>
+              <th
+                className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32 select-none cursor-pointer"
+                onClick={() => toggleSort('fixType')}
+                title="修正の種類で並び替え"
+              >
+                修正の種類 {sortState.key === 'fixType' ? (sortState.order === 'asc' ? '▲' : '▼') : ''}
+              </th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-36">カテゴリ</th>
               {isBasisAugmented && (
                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[200px]">根拠</th>
               )}
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[200px]">指摘事項</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider min-w-[200px]">改善案</th>
-              <th className="px-3 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-32">修正の種類</th>
               <th className="px-1 py-3 w-16"><span className="sr-only">アクション</span></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {data.map((item, index) => (
+            {sorted.map(({ item, originalIndex }) => (
               <tr
                 key={item.id}
                 className={`transition-colors group ${onRowClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-slate-50'}`}
-                onClick={() => onRowClick?.(index)}
+                onClick={() => onRowClick?.(originalIndex)}
               >
                 <td className="px-3 py-2 text-sm text-slate-700 align-top">
                   <p className="py-2 text-center">{item.slideNumber}</p>
+                </td>
+                <td className="px-3 py-2 text-sm text-slate-700 align-top">
+                  <div className="py-2">
+                    <CorrectionTypeBadge type={item.correctionType} />
+                  </div>
                 </td>
                 <td className="px-3 py-2 text-sm text-slate-700 align-top">
                   <p className="py-2">{item.category}</p>
@@ -110,11 +162,6 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
                 </td>
                 <td className="px-3 py-2 text-sm text-slate-700 align-top">
                   <p className="whitespace-pre-wrap break-words py-2">{item.suggestion}</p>
-                </td>
-                <td className="px-3 py-2 text-sm text-slate-700 align-top">
-                  <div className="py-2">
-                    <CorrectionTypeBadge type={item.correctionType} />
-                  </div>
                 </td>
                 <td className="px-1 py-2 text-center align-top">
                   <div className="py-2">

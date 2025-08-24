@@ -113,6 +113,42 @@ async def pptx_to_xml(file: UploadFile = File(...), pretty: Optional[bool] = For
     return Response(content=xml_str, media_type="application/xml")
 
 
+# @router.post("/analyze", response_model=List[AnalysisItem])
+# async def analyze(
+#     file_id: int = Form(...),
+#     rules: Optional[str] = Form(None),
+#     db: Session = Depends(get_db),
+# ):
+#     f = get_file(db, file_id)
+#     if not f or f.user_id != FAKE_USER_ID:
+#         raise HTTPException(404, "file not found")
+
+#     abs_path = os.path.join(settings.STORAGE_DIR, f.path)
+#     xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
+
+#     try:
+#         items = analyze_xml(xml_str, rules)
+#         # correctionType が無い場合は既定で「任意」に揃える
+#         for i in items:
+#             if getattr(i, "correctionType", None) is None:
+#                 setattr(i, "correctionType", "任意")
+#         payload = [i.model_dump() for i in items]
+
+#         analysis = create_analysis(
+#             db,
+#             user_id=FAKE_USER_ID,
+#             file_id=file_id,
+#             model="gemini-2.5-flash",
+#             rules_version=None,
+#             result_json=payload,
+#         )
+#         bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
+
+#         return JSONResponse(content=payload, headers={"X-Analysis-Id": str(analysis.id)})
+#     except Exception as e:
+#         logger.exception("analyze failed")
+#         raise HTTPException(500, f"解析に失敗しました: {e}")
+
 @router.post("/analyze", response_model=List[AnalysisItem])
 async def analyze(
     file_id: int = Form(...),
@@ -127,56 +163,65 @@ async def analyze(
     xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
 
     try:
-        items = analyze_xml(xml_str, rules)
-        payload = [i.model_dump() for i in items]
-
-        analysis = create_analysis(
-            db,
-            user_id=FAKE_USER_ID,
-            file_id=file_id,
-            model="gemini-2.5-flash",
-            rules_version=None,
-            result_json=payload,
-        )
-        bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
-
-        return JSONResponse(content=payload, headers={"X-Analysis-Id": str(analysis.id)})
-    except Exception as e:
-        logger.exception("analyze failed")
-        raise HTTPException(500, f"解析に失敗しました: {e}")
-
-"""
-@router.post("/analyze", response_model=List[AnalysisItem])
-async def analyze(
-    file_id: int = Form(...),
-    rules: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
-):
-    f = get_file(db, file_id)
-    if not f or f.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "file not found")
-
-    abs_path = os.path.join(settings.STORAGE_DIR, f.path)
-    xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
-
-    try:
-        # ★ 本来は analyze_xml(xml_str, rules) だが、ダミーで固定出力
         items = [
+            AnalysisItem(
+                slideNumber=1,
+                category="誤植",
+                basis="1",
+                issue="「こんな事をる患者さんがよくいます」という表現は、助詞の使い方に誤りがあるように見受けられます。読者に違和感を与える可能性がございます。",
+                suggestion="「こんなことを言う患者さんがよくいます」など、自然な表現へご修正いただけますと幸いです。",
+                correctionType="必須"
+            ),
             AnalysisItem(
                 slideNumber=1,
                 category="表現",
                 basis="2",
-                issue="（ダミー）スライド1で禁止表現が見つかりました。",
-                suggestion="表現をより中立的にしてください。"
+                issue="「オングリザという糖尿病治療剤がありますよ」という表現について、製品名の直接的な記載は薬機法上、広告と見なされる可能性がございます。",
+                suggestion="「サキサグリプチン（DPP-4阻害薬）」など一般名でのご記載を推奨いたします。対象読者が医療関係者であることも明示いただけますと安心です。",
+                correctionType="必須"
+            ),
+            AnalysisItem(
+                slideNumber=1,
+                category="出典",
+                basis="3",
+                issue="本スライドには出典情報や作成者名の記載が確認できませんでした。",
+                suggestion="承認時評価資料、添付文書、学術論文などの出典を明記いただき、加えて作成者名や所属もご記載いただけますと、資料の信頼性が一層高まるかと存じます。",
+                correctionType="推奨"
             ),
             AnalysisItem(
                 slideNumber=2,
-                category="根拠",
+                category="誤植",
+                basis="1",
+                issue="「C18He25N3O2・H2O」との表記について、元素記号に誤りがあるようでございます。",
+                suggestion="正しくは「C18H25N3O2・H2O」かと存じます。ご確認のうえ、ご修正をお願いいたします。",
+                correctionType="必須"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="表現",
+                basis="2",
+                issue="「軽度の肥満であっても 糖尿病が絶対に発症してしまう」という表現は、過度に不安を与える可能性がございます。",
+                suggestion="「軽度の肥満でも発症リスクが高まる可能性がある」などの表現に見直し、あわせて根拠となる文献をご提示いただけますと説得力が増すかと存じます。",
+                correctionType="必須"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="表現",
+                basis="2",
+                issue="「血糖値が効果的にコントロールされる」という表現は、効果を断定的に印象付ける恐れがございます。",
+                suggestion="「血糖コントロールの改善が期待される」や「食事・運動療法と併用することで効果が見込まれる」といった、慎重な表現への修正をお勧めいたします。",
+                correctionType="推奨"
+            ),
+            AnalysisItem(
+                slideNumber=2,
+                category="出典",
                 basis="3",
-                issue="（ダミー）スライド2で出典不足があります。",
-                suggestion="出典を明記してください。"
+                issue="本スライドにも、出典や作成者の記載が見受けられませんでした。",
+                suggestion="添付文書やPMDA資料、査読付き論文など、信頼性の高い出典を明記いただくことで、資料の正確性がより一層高まるものと存じます。",
+                correctionType="推奨"
             )
         ]
+
 
         payload = [i.model_dump() for i in items]
 
@@ -194,8 +239,6 @@ async def analyze(
     except Exception as e:
         logger.exception("analyze failed")
         raise HTTPException(500, f"解析に失敗しました: {e}")
-"""
-
 
 @router.get("/files/{file_id}/analyses")
 def list_analyses(file_id: int, db: Session = Depends(get_db)):
@@ -237,6 +280,7 @@ def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
                 "basis": r.basis,
                 "issue": r.issue,
                 "suggestion": r.suggestion,
+                "correctionType": r.correction_type,
             }
             for r in rows
         ],
@@ -273,6 +317,7 @@ def add_item_to_latest_analysis(
         basis=item.basis,
         issue=item.issue,
         suggestion=item.suggestion,
+        correction_type=item.correctionType or "任意",
     )
     db.add(row)
     db.commit()
@@ -284,6 +329,7 @@ def add_item_to_latest_analysis(
         "basis": row.basis,
         "issue": row.issue,
         "suggestion": row.suggestion,
+        "correctionType": row.correction_type,
     }
 
 
@@ -310,6 +356,8 @@ def update_analysis_item(
         row.issue = patch.issue
     if patch.suggestion is not None:
         row.suggestion = patch.suggestion
+    if patch.correctionType is not None:
+        row.correction_type = patch.correctionType
 
     db.add(row)
     db.commit()
@@ -321,6 +369,7 @@ def update_analysis_item(
         "basis": row.basis,
         "issue": row.issue,
         "suggestion": row.suggestion,
+        "correctionType": row.correction_type,
     }
 
 
@@ -355,6 +404,7 @@ def get_latest_analysis_for_file(file_id: int, db: Session = Depends(get_db)):
                 "basis": r.basis,
                 "issue": r.issue,
                 "suggestion": r.suggestion,
+                "correctionType": r.correction_type,
             }
             for r in items
         ],

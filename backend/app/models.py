@@ -46,5 +46,6 @@ class AnalysisItemRow(Base):
     basis: Mapped[str] = mapped_column(Text, nullable=False)
     issue: Mapped[str] = mapped_column(Text, nullable=False)
     suggestion: Mapped[str] = mapped_column(Text, nullable=False)
+    correction_type: Mapped[str | None] = mapped_column(String, nullable=True)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="items")
