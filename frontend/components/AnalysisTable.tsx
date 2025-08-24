@@ -44,9 +44,17 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
     decorated.sort((a, b) => {
       let base = 0;
       if (sortState.key === 'fixType') {
-        const va = a.item.correctionType ?? '';
-        const vb = b.item.correctionType ?? '';
-        base = String(va).localeCompare(String(vb), 'ja', { numeric: true, sensitivity: 'base' });
+        // 任意/必須の並び順をカスタム定義: 昇順でも「必須」から始まる
+        const rank = (t?: string) => (t === '必須' ? 0 : t === '任意' ? 1 : 2);
+        const wa = rank(a.item.correctionType);
+        const wb = rank(b.item.correctionType);
+        base = wa - wb; // asc: 必須(0)→任意(1)
+        if (base === 0) {
+          // 同じ種類なら日本語ロケールで安定比較（将来値追加に備える）
+          const va = a.item.correctionType ?? '';
+          const vb = b.item.correctionType ?? '';
+          base = String(va).localeCompare(String(vb), 'ja', { numeric: true, sensitivity: 'base' });
+        }
       } else {
         const va = a.item.slideNumber ?? 0;
         const vb = b.item.slideNumber ?? 0;
@@ -63,10 +71,15 @@ const AnalysisTable: React.FC<AnalysisTableProps> = ({
   }, [data, sortState]);
 
   const toggleSort = (key: 'fixType' | 'slide') =>
-    setSortState((prev) => ({
-      key,
-      order: prev.key === key && prev.order === 'asc' ? 'desc' : 'asc',
-    }));
+    setSortState((prev) => {
+      if (prev.key === key) {
+        return { key, order: prev.order === 'asc' ? 'desc' : 'asc' };
+      }
+      // 別列から切り替えた初回の並び方向
+      // 修正の種類の昇順は「必須→任意」になるよう comparator 側で定義
+      const initialOrder = key === 'fixType' ? 'asc' : 'asc';
+      return { key, order: initialOrder };
+    });
 
   const renderControlBar = () => {
     return (
