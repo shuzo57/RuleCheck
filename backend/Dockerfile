@@ -1,6 +1,6 @@
 # =======================================
 # backend/Dockerfile
-# FastAPI + SQLite 用のシンプルなDockerfile
+# FastAPI + Postgres 用のシンプルなDockerfile
 # - 開発: uvicorn --reload
 # - 本番: gunicorn(uvicorn workers)
 #   ※ 本番/開発は環境変数 APP_ENV で分岐
@@ -27,8 +27,8 @@ EXPOSE 8000
 
 # 既定の環境（dev or prod）
 ENV APP_ENV=dev
-# SQLite のデフォルト（必要に応じて .env で上書き）
-ENV DB_URL=sqlite:///./local.db
+# Postgres のデフォルト（必要に応じて .env で上書き）
+ENV DB_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
 ENV STORAGE_DIR=/app/storage
 
 # ヘルスチェック（/health があれば）
