@@ -1,9 +1,21 @@
 # =======================================
 # docker-compose.yml（開発用）
-# - backend: ホットリロード、SQLite をローカルに永続化
+# - backend: ホットリロード、PostgreSQL を利用
 # - frontend: Vite dev サーバ
 # =======================================
 services:
+  postgres:
+    image: postgres:15
+    container_name: myapp-postgres
+    environment:
+      POSTGRES_USER: myapp
+      POSTGRES_PASSWORD: myapp
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   api:
     build:
       context: .
@@ -15,12 +27,12 @@ services:
     environment:
       # APP_ENV=dev なら --reload になります
       - APP_ENV=dev
-      # DB_URL が未設定なら Dockerfile の既定 sqlite:///./local.db が使われる
+      - DB_URL=postgresql+psycopg2://myapp:myapp@postgres:5432/myapp
+    depends_on:
+      - postgres
     volumes:
       # 開発中はソースをコンテナへマウントしてホットリロード
       - ./backend:/app
-      # SQLite ファイルをホストにも保存（任意）
-      - ./backend/local.db:/app/local.db
       # アップロード保存先
       - ./backend/storage:/app/storage
     ports:
@@ -45,3 +57,6 @@ services:
       - api
     ports:
       - "5173:5173"
+
+volumes:
+  postgres_data:
