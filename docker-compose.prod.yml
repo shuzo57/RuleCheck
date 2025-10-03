@@ -1,9 +1,19 @@
 # =======================================
 # docker-compose.prod.yml（本番用）
-# - backend: gunicorn + uvicorn workers
+# - backend: gunicorn + uvicorn workers（PostgreSQL 利用）
 # - frontend: Nginx で / を配信
 # =======================================
 services:
+  postgres:
+    image: postgres:15
+    container_name: myapp-postgres
+    environment:
+      POSTGRES_USER: myapp
+      POSTGRES_PASSWORD: myapp
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   api:
     build:
       context: .
@@ -14,9 +24,11 @@ services:
       - backend/.env
     environment:
       - APP_ENV=prod
+      - DB_URL=postgresql+psycopg2://myapp:myapp@postgres:5432/myapp
+    depends_on:
+      - postgres
     volumes:
-      # DB と ストレージを永続化
-      - ./backend/local.db:/app/local.db
+      # ストレージを永続化
       - ./backend/storage:/app/storage
     ports:
       - "8000:8000"
@@ -35,3 +47,6 @@ services:
       - api
     ports:
       - "80:80"
+
+volumes:
+  postgres_data:
