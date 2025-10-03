@@ -1,0 +1,37 @@
+# =======================================
+# docker-compose.prod.yml（本番用）
+# - backend: gunicorn + uvicorn workers
+# - frontend: Nginx で / を配信
+# =======================================
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: myapp-backend:prod
+    container_name: myapp-api
+    env_file:
+      - backend/.env
+    environment:
+      - APP_ENV=prod
+    volumes:
+      # DB と ストレージを永続化
+      - ./backend/local.db:/app/local.db
+      - ./backend/storage:/app/storage
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
+      args:
+        # ビルド時に API エンドポイントを固定（CDN/ドメインに合わせて差し替え）
+        VITE_API_BASE: http://localhost:8000
+    image: myapp-frontend:prod
+    container_name: myapp-web
+    depends_on:
+      - api
+    ports:
+      - "80:80"
