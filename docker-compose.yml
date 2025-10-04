@@ -1,16 +1,9 @@
-# =======================================
-# docker-compose.yml（開発用）
-# - backend: ホットリロード、PostgreSQL を利用
-# - frontend: Vite dev サーバ
-# =======================================
 services:
   postgres:
-    image: postgres:15
+    image: postgres:18
     container_name: myapp-postgres
-    environment:
-      POSTGRES_USER: myapp
-      POSTGRES_PASSWORD: myapp
-      POSTGRES_DB: myapp
+    env_file:
+      - backend/.env.postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,18 +16,14 @@ services:
     image: myapp-backend:dev
     container_name: myapp-api
     env_file:
-      - backend/.env        # GEMINI_API_KEY, DB_URL, STORAGE_DIR をここで設定
+      - backend/.env
     environment:
-      # APP_ENV=dev なら --reload になります
       - APP_ENV=dev
-      - DB_URL=postgresql+psycopg2://myapp:myapp@postgres:5432/myapp
     depends_on:
       - postgres
     volumes:
-      # 開発中はソースをコンテナへマウントしてホットリロード
       - ./backend:/app
-      # アップロード保存先
-      - ./backend/storage:/app/storage
+      # - ./backend/storage:/app/storage
     ports:
       - "8000:8000"
 
@@ -45,13 +34,10 @@ services:
       target: dev
     image: myapp-frontend:dev
     container_name: myapp-web
-    # Vite dev server
     environment:
-      # 開発時はViteの.envでもOK。ここで上書きも可能
       - VITE_API_BASE=http://localhost:8000
     volumes:
       - ./frontend:/app
-      # node_modules はコンテナ側のを使うのが安全
       - /app/node_modules
     depends_on:
       - api

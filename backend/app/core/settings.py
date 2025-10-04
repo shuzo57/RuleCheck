@@ -1,17 +1,17 @@
-from typing import List
-
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
-    DB_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/postgres"
-    STORAGE_DIR: str = "./app/storage"
-    ANALYZE_MODE: str = "mock"  # auto | mock | llm
+    ANALYZE_MODE: str = "mock"
+    STORAGE_DIR: str = "./storage"
+    DB_URL: str = ""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 settings = Settings()
