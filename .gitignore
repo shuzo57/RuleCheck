@@ -23,6 +23,7 @@ local.db
 backend/app/storage/
 backend/tests/data/*.pptx
 storage
+data
 
 # パッケージ関連
 build/
