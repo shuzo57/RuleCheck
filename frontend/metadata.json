@@ -1,6 +1,6 @@
 {
-  "name": "規定チェックAI（仮）v9",
-  "description": "パワポのスライドをアップロードして、AIによる改善提案を瞬時に受け取ることができます。指摘事項は表形式で表示され、Excelとしてダウンロードも可能です。",
+  "name": "Message Board",
+  "description": "テキストを保存・一覧表示・削除できるシンプルなメッセージ管理アプリです。",
   "requestFramePermissions": [],
   "prompt": ""
 }

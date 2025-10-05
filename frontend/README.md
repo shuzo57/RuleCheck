@@ -1,14 +1,11 @@
-# Run and deploy your AI Studio app
+# Frontend
 
-This contains everything you need to run your app locally.
+メッセージを登録・一覧表示・削除する最小構成の React + Vite アプリケーションです。
 
-## Run Locally
+## ローカル実行手順
 
-**Prerequisites:**  Node.js
+1. `npm install`
+2. 必要に応じて `frontend/.env` に `VITE_API_BASE`（例: `http://127.0.0.1:8000`）を設定
+3. `npm run dev`
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+バックエンドは FastAPI で提供されているため、別ターミナルで起動してください。
