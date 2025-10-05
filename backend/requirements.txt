@@ -1,14 +1,5 @@
 fastapi
 uvicorn[standard]
-gunicorn
-python-dotenv
-python-multipart
-google-generativeai
-google-genai
+sqlalchemy
 pydantic
 pydantic_settings
-python-pptx
-markitdown
-pandas
-sqlalchemy
-psycopg2-binary

@@ -1,55 +1,22 @@
 services:
-  postgres:
-    image: postgres:17
-    container_name: myapp-postgres
-    env_file:
-      - backend/.env.postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports: ["5432:5432"]
-
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: myapp-backend:dev
-    container_name: myapp-api
-    env_file:
-      - backend/.env
     environment:
-      - APP_ENV=dev
       - PORT=8000
-      - STORAGE_DIR=/data
-    depends_on: [postgres]
-    volumes:
-      - ./backend:/app
-      - app_storage:/data
     ports:
       - "8000:8000"
-    user: "0:0"
-    entrypoint: >
-      sh -lc "
-        mkdir -p /data &&
-        chown -R 1000:1000 /data || true;
-        exec su -s /bin/sh -c 'exec uvicorn app.main:app --host 0.0.0.0 --port 8000' appuser
-      "
+    command: bash -lc "uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   web:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-      target: build
-    image: myapp-frontend:dev
-    container_name: myapp-web
     environment:
       - VITE_API_BASE=http://localhost:8000
-    command: sh -lc "npm ci && npm run dev -- --host 0.0.0.0"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on: [api]
-    ports: ["5173:5173"]
-
-volumes:
-  postgres_data:
-  app_storage:
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api

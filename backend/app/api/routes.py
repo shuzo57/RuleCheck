@@ -1,405 +1,52 @@
-import hashlib
-import logging
-import os
-from typing import List, Optional
-from xml.etree import ElementTree as ET
+from typing import List
 
-from app.core.settings import settings
-from app.crud import (bulk_create_analysis_items, create_analysis, create_file,
-                      delete_file, get_analysis_with_items, get_file,
-                      get_latest_analysis, list_analyses_by_file, list_files)
-from app.db import get_db
-from app.models import AnalysisItemRow
-from app.services.analysis import analyze_xml
-from app.services.pptx_parser import PptxConverter
-from app.services.schemas import (AnalysisItem, AnalysisItemCreate,
-                                  AnalysisItemUpdate)
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+from app.crud import create_message, delete_message, list_messages
+from app.db import get_db
+from app.models import Message
+
 router = APIRouter()
 
-FAKE_USER_ID = "localuser"
+
+class MessageResponse(BaseModel):
+    id: int
+    created_at: str = Field(..., description="ISO 8601 timestamp in JST")
+    text: str
+
+    @classmethod
+    def from_orm(cls, message: Message) -> "MessageResponse":
+        return cls(id=message.id, created_at=message.created_at.isoformat(), text=message.text)
+
+
+class MessageCreateRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="メッセージ本文")
 
 
 @router.get("/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-def _sha256(b: bytes) -> str:
-    h = hashlib.sha256()
-    h.update(b)
-    return h.hexdigest()
+@router.get("/messages", response_model=List[MessageResponse])
+def get_messages(db: Session = Depends(get_db)) -> List[MessageResponse]:
+    messages = list_messages(db)
+    return [MessageResponse.from_orm(message) for message in messages]
 
 
-@router.post("/files")
-async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not (file.filename or "").lower().endswith(".pptx"):
-        raise HTTPException(400, "pptxファイルのみ対応しています")
-
-    data = await file.read()
-    digest = _sha256(data)
-    rel_path = f"{digest[:2]}/{digest}.pptx"
-    abs_path = os.path.join(settings.STORAGE_DIR, rel_path)
-    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-    with open(abs_path, "wb") as f:
-        f.write(data)
-
-    rec = create_file(
-        db,
-        user_id=FAKE_USER_ID,
-        filename=file.filename,
-        path=rel_path,
-        sha256=digest,
-        size_bytes=len(data),
-    )
-    return {
-        "file_id": rec.id,
-        "filename": rec.filename,
-        "size_bytes": rec.size_bytes,
-        "sha256": rec.sha256,
-    }
+@router.post("/messages", response_model=MessageResponse)
+def post_message(payload: MessageCreateRequest, db: Session = Depends(get_db)) -> MessageResponse:
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="テキストを入力してください")
+    message = create_message(db, text=text)
+    return MessageResponse.from_orm(message)
 
 
-@router.get("/files")
-def get_files(db: Session = Depends(get_db)):
-    files = list_files(db, user_id=FAKE_USER_ID)
-    result = []
-    for f in files:
-        analyses = list_analyses_by_file(db, file_id=f.id, user_id=FAKE_USER_ID)
-        status = "success" if len(analyses) > 0 else "pending"
-        result.append(
-            {
-                "id": str(f.id),
-                "file": None,
-                "name": f.filename,
-                "size": f.size_bytes,
-                "uploadDate": f.created_at.isoformat(),
-                "status": status,
-                "analysisResult": [],
-                "error": None,
-                "isBasisAugmented": False,
-                "augmentationStatus": "idle",
-            }
-        )
-    return result
-
-
-@router.delete("/files/{file_id}")
-def remove_file(file_id: int, db: Session = Depends(get_db)):
-    f = get_file(db, file_id)
-    if not f or f.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "not found")
-    try:
-        os.remove(os.path.join(settings.STORAGE_DIR, f.path))
-    except FileNotFoundError:
-        pass
-    delete_file(db, file_id)
-    return {"ok": True}
-
-
-@router.post("/pptx/xml")
-async def pptx_to_xml(file: UploadFile = File(...), pretty: Optional[bool] = Form(True)):
-    if not (file.filename or "").lower().endswith(".pptx"):
-        raise HTTPException(400, "pptxファイルのみ対応しています")
-    xml_str = PptxConverter.convert_to_xml(file, pretty=bool(pretty))
-    return Response(content=xml_str, media_type="application/xml")
-
-
-def _mock_items_from_xml(_: str) -> list[AnalysisItem]:
-    return [
-        AnalysisItem(
-            slideNumber=1,
-            category="誤植",
-            basis="1",
-            issue="「こんな事をる患者さんがよくいます」という表現は、助詞の使い方に誤りがあるように見受けられます。読者に違和感を与える可能性がございます。",
-            suggestion="「こんなことを言う患者さんがよくいます」など、自然な表現へご修正いただけますと幸いです。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=1,
-            category="表現",
-            basis="2",
-            issue="「オングリザという糖尿病治療剤がありますよ」という表現について、製品名の直接的な記載は薬機法上、広告と見なされる可能性がございます。",
-            suggestion="「サキサグリプチン（DPP-4阻害薬）」など一般名でのご記載を推奨いたします。対象読者が医療関係者であることも明示いただけますと安心です。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=1,
-            category="出典",
-            basis="3",
-            issue="本スライドには出典情報や作成者名の記載が確認できませんでした。",
-            suggestion="承認時評価資料、添付文書、学術論文などの出典を明記いただき、加えて作成者名や所属もご記載いただけますと、資料の信頼性が一層高まるかと存じます。",
-            correctionType="任意"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="誤植",
-            basis="1",
-            issue="「C18He25N3O2・H2O」との表記について、元素記号に誤りがあるようでございます。",
-            suggestion="正しくは「C18H25N3O2・H2O」かと存じます。ご確認のうえ、ご修正をお願いいたします。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="表現",
-            basis="2",
-            issue="「軽度の肥満であっても 糖尿病が絶対に発症してしまう」という表現は、過度に不安を与える可能性がございます。",
-            suggestion="「軽度の肥満でも発症リスクが高まる可能性がある」などの表現に見直し、あわせて根拠となる文献をご提示いただけますと説得力が増すかと存じます。",
-            correctionType="必須"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="表現",
-            basis="2",
-            issue="「血糖値が効果的にコントロールされる」という表現は、効果を断定的に印象付ける恐れがございます。",
-            suggestion="「血糖コントロールの改善が期待される」や「食事・運動療法と併用することで効果が見込まれる」といった、慎重な表現への修正をお勧めいたします。",
-            correctionType="任意"
-        ),
-        AnalysisItem(
-            slideNumber=2,
-            category="出典",
-            basis="3",
-            issue="本スライドにも、出典や作成者の記載が見受けられませんでした。",
-            suggestion="添付文書やPMDA資料、査読付き論文など、信頼性の高い出典を明記いただくことで、資料の正確性がより一層高まるものと存じます。",
-            correctionType="任意"
-        )
-    ]
-
-
-
-@router.post("/analyze", response_model=List[AnalysisItem])
-async def analyze(
-    file_id: int = Form(...),
-    rules: Optional[str] = Form(None),
-    mode: Optional[str] = Form(None),  # auto | mock | llm （省略時は設定の ANALYZE_MODE または auto）
-    db: Session = Depends(get_db),
-):
-    f = get_file(db, file_id)
-    if not f or f.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "file not found")
-
-    abs_path = os.path.join(settings.STORAGE_DIR, f.path)
-    xml_str = PptxConverter.convert_to_xml(abs_path, pretty=False)
-
-    # 実行モードの決定
-    req_mode = (mode or settings.ANALYZE_MODE or "auto").lower()
-    if req_mode not in {"auto", "mock", "llm"}:
-        raise HTTPException(400, "mode は auto/mock/llm のいずれかを指定してください")
-
-    items: list[AnalysisItem]
-    model_name = "gemini-2.5-flash"
-
-    if req_mode == "mock":
-        items = _mock_items_from_xml(xml_str)
-        model_name = "mock"
-    elif req_mode == "llm":
-        if not settings.GEMINI_API_KEY:
-            raise HTTPException(400, "GEMINI_API_KEY が未設定のため LLM モードは利用できません")
-        try:
-            items = analyze_xml(xml_str, rules)
-        except Exception as e:
-            logger.exception("LLM analyze failed in llm mode")
-            raise HTTPException(502, f"LLM 解析に失敗しました: {e}")
-    else:  # auto
-        try:
-            if settings.GEMINI_API_KEY:
-                items = analyze_xml(xml_str, rules)
-            else:
-                raise RuntimeError("GEMINI_API_KEY is not set")
-        except Exception as e:
-            logger.warning("LLM analyze failed; fallback to mock: %s", e)
-            items = _mock_items_from_xml(xml_str)
-            model_name = "mock"
-
-    for i in items:
-        if getattr(i, "correctionType", None) is None:
-            setattr(i, "correctionType", "任意")
-
-    payload = [i.model_dump() for i in items]
-
-    analysis = create_analysis(
-        db,
-        user_id=FAKE_USER_ID,
-        file_id=file_id,
-        model=model_name,
-        rules_version=None,
-        result_json=payload,
-    )
-    bulk_create_analysis_items(db, analysis_id=analysis.id, items=items)
-
-    return JSONResponse(
-        content=payload,
-        headers={
-            "X-Analysis-Id": str(analysis.id),
-            "X-Analysis-Mode": model_name,
-        },
-    )
-
-
-@router.get("/files/{file_id}/analyses")
-def list_analyses(file_id: int, db: Session = Depends(get_db)):
-    f = get_file(db, file_id)
-    if not f or f.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "not found")
-    lst = list_analyses_by_file(db, file_id=file_id, user_id=FAKE_USER_ID)
-    return [
-        {
-            "id": a.id,
-            "created_at": str(a.created_at),
-            "model": a.model,
-            "status": a.status,
-            "items_count": len(a.items),
-        }
-        for a in lst
-    ]
-
-
-@router.get("/analyses/{analysis_id}")
-def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
-    a, rows = get_analysis_with_items(db, analysis_id)
-    if not a or a.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "analysis not found")
-    return {
-        "id": a.id,
-        "file_id": a.file_id,
-        "created_at": str(a.created_at),
-        "model": a.model,
-        "status": a.status,
-        "rules_version": a.rules_version,
-        "result_json": a.result_json,
-        "items": [
-            {
-                "id": r.id,
-                "slideNumber": r.slide_number,
-                "category": r.category,
-                "basis": r.basis,
-                "issue": r.issue,
-                "suggestion": r.suggestion,
-                "correctionType": r.correction_type,
-            }
-            for r in rows
-        ],
-    }
-
-
-@router.post("/files/{file_id}/analyses/latest/items")
-def add_item_to_latest_analysis(
-    file_id: int, item: AnalysisItemCreate, db: Session = Depends(get_db)
-):
-    f = get_file(db, file_id)
-    if not f or f.user_id != FAKE_USER_ID:
-        raise HTTPException(404, "file not found")
-
-    analyses = list_analyses_by_file(db, file_id=file_id, user_id=FAKE_USER_ID)
-    if analyses:
-        a = analyses[0]
-    else:
-        a = create_analysis(
-            db,
-            user_id=FAKE_USER_ID,
-            file_id=file_id,
-            model="manual-edit",
-            rules_version=None,
-            result_json=[],
-        )
-
-    row = AnalysisItemRow(
-        analysis_id=a.id,
-        slide_number=item.slideNumber,
-        category=item.category,
-        basis=item.basis,
-        issue=item.issue,
-        suggestion=item.suggestion,
-        correction_type=item.correctionType or "任意",
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return {
-        "id": row.id,
-        "slideNumber": row.slide_number,
-        "category": row.category,
-        "basis": row.basis,
-        "issue": row.issue,
-        "suggestion": row.suggestion,
-        "correctionType": row.correction_type,
-    }
-
-
-@router.patch("/analysis-items/{item_id}")
-def update_analysis_item(
-    item_id: int, patch: AnalysisItemUpdate, db: Session = Depends(get_db)
-):
-    row = db.get(AnalysisItemRow, item_id)
-    if not row:
-        raise HTTPException(404, "item not found")
-    if not row.analysis or row.analysis.user_id != FAKE_USER_ID:
-        raise HTTPException(403, "forbidden")
-
-    if patch.slideNumber is not None:
-        row.slide_number = patch.slideNumber
-    if patch.category is not None:
-        row.category = patch.category
-    if patch.basis is not None:
-        row.basis = patch.basis
-    if patch.issue is not None:
-        row.issue = patch.issue
-    if patch.suggestion is not None:
-        row.suggestion = patch.suggestion
-    if patch.correctionType is not None:
-        row.correction_type = patch.correctionType
-
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return {
-        "id": row.id,
-        "slideNumber": row.slide_number,
-        "category": row.category,
-        "basis": row.basis,
-        "issue": row.issue,
-        "suggestion": row.suggestion,
-        "correctionType": row.correction_type,
-    }
-
-
-@router.delete("/analysis-items/{item_id}")
-def delete_analysis_item(item_id: int, db: Session = Depends(get_db)):
-    row = db.get(AnalysisItemRow, item_id)
-    if not row:
-        raise HTTPException(404, "item not found")
-    if not row.analysis or row.analysis.user_id != FAKE_USER_ID:
-        raise HTTPException(403, "forbidden")
-    db.delete(row)
-    db.commit()
-    return {"ok": True}
-
-
-@router.get("/files/{file_id}/analyses/latest")
-def get_latest_analysis_for_file(file_id: int, db: Session = Depends(get_db)):
-    latest, items = get_latest_analysis(db, file_id=file_id, user_id=FAKE_USER_ID)
-    if not latest:
-        raise HTTPException(404, "no analysis found")
-
-    return {
-        "id": latest.id,
-        "created_at": str(latest.created_at),
-        "model": latest.model,
-        "status": latest.status,
-        "items": [
-            {
-                "id": r.id,
-                "slideNumber": r.slide_number,
-                "category": r.category,
-                "basis": r.basis,
-                "issue": r.issue,
-                "suggestion": r.suggestion,
-                "correctionType": r.correction_type,
-            }
-            for r in items
-        ],
-    }
+@router.delete("/messages/{message_id}", status_code=204)
+def remove_message(message_id: int, db: Session = Depends(get_db)) -> None:
+    deleted = delete_message(db, message_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
