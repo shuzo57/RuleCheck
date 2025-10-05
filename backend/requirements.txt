@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+gunicorn
 python-dotenv
 python-multipart
 google-generativeai
@@ -9,4 +10,5 @@ pydantic_settings
 python-pptx
 markitdown
 pandas
-sqlalchemy 
+sqlalchemy
+psycopg2-binary

@@ -12,6 +12,7 @@ ENV/
 # 環境変数ファイル
 .env
 .envrc
+.env.postgres
 
 # SQLite データベース（ローカル専用）
 *.sqlite3
@@ -21,6 +22,8 @@ local.db
 # アップロード・生成ファイル
 backend/app/storage/
 backend/tests/data/*.pptx
+storage
+data
 
 # パッケージ関連
 build/
